@@ -1,10 +1,13 @@
 import type {
   AgentDescriptor,
+  AgentTask,
   ApplicationRuntimeSettings,
   ChatSession,
   KnowledgeBase,
   ModuleManifest,
   Skill,
+  CreateAgentTaskInput,
+  DecideTaskInput,
   UpsertSkillInput
 } from "@campus-ai/contracts";
 
@@ -45,6 +48,16 @@ export const api = {
       body: JSON.stringify({ content })
     }),
   cancel: (id: string) => request<void>(`/api/sessions/${id}/cancel`, { method: "POST" }),
+  tasks: () => request<AgentTask[]>("/api/tasks"),
+  task: (id: string) => request<AgentTask>(`/api/tasks/${id}`),
+  createTask: (value: CreateAgentTaskInput) =>
+    request<AgentTask>("/api/tasks", { method: "POST", body: JSON.stringify(value) }),
+  decideTask: (id: string, value: DecideTaskInput) =>
+    request<AgentTask>(`/api/tasks/${id}/decision`, {
+      method: "POST",
+      body: JSON.stringify(value)
+    }),
+  cancelTask: (id: string) => request<void>(`/api/tasks/${id}/cancel`, { method: "POST" }),
   skills: (moduleId: string) => request<Skill[]>(`/api/modules/${moduleId}/skills`),
   createSkill: (moduleId: string, input: UpsertSkillInput) =>
     request<Skill>(`/api/modules/${moduleId}/skills`, { method: "POST", body: JSON.stringify(input) }),

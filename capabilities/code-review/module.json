@@ -1,0 +1,21 @@
+{
+  "id": "code-review",
+  "name": "代码检视",
+  "description": "解析 GitHub PR 或 GitLab MR，检视确定的代码差异并生成可确认的本地报告",
+  "icon": "git-pull-request",
+  "enabled": true,
+  "capabilityVersion": "1.0.0",
+  "experience": "task",
+  "taskKind": "code-review",
+  "systemPromptFile": "prompts/system.md",
+  "skillDirectory": "skills",
+  "runtime": {
+    "allowedTools": ["Read", "Glob", "Grep", "Write"]
+  },
+  "constraints": [
+    "只进行代码检视，不修改 MR/PR 中的业务源码。",
+    "只允许写入 .ai-workbench/output，不得向 GitHub、GitLab 或其他外部系统直接提交评论。",
+    "检视必须以平台准备的 base SHA、head SHA 和 change.diff 为基线。",
+    "行级意见必须包含文件和尽可能准确的行号；无法确认的问题不得伪装成确定缺陷。"
+  ]
+}

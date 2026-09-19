@@ -25,6 +25,8 @@ Route 不得启动子进程，Adapter 不得决定业务状态流转。
 - 每次执行保存输入摘要、模块版本、Skill IDs、模型、Agent Session ID 和结果。
 - 服务重启后未知运行态标记 `interrupted`，不得伪装成成功。
 - 多轮恢复失败时允许用平台消息记录创建新 Agent Session，但必须保留审计关系。
+- Git 拉取、分支切换和 MR/PR ref 解析统一通过 `GitWorkspace`，禁止 Agent 自行选择代码基线。
+- Agent 输出统一通过 `ArtifactReader` 校验；最终回复文本不能代替 `result.json` 和 `report.md`。
 
 ## 持久化
 

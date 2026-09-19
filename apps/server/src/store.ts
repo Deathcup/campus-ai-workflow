@@ -2,6 +2,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Pool } from "pg";
 import type {
+  AgentTask,
   ApplicationRuntimeSettings,
   ChatSession,
   KnowledgeBase,
@@ -16,6 +17,9 @@ export interface DataStore {
   removeKnowledgeBase(id: string): Promise<void>;
   listApplicationSettings(): Promise<ApplicationRuntimeSettings[]>;
   putApplicationSettings(value: ApplicationRuntimeSettings): Promise<void>;
+  listTasks(): Promise<AgentTask[]>;
+  getTask(id: string): Promise<AgentTask | undefined>;
+  putTask(value: AgentTask): Promise<void>;
   listSessions(): Promise<ChatSession[]>;
   getSession(id: string): Promise<ChatSession | undefined>;
   putSession(value: ChatSession): Promise<void>;
@@ -26,6 +30,7 @@ export interface DataStore {
 type JsonState = {
   knowledgeBases: KnowledgeBase[];
   applicationSettings: ApplicationRuntimeSettings[];
+  tasks: AgentTask[];
   sessions: ChatSession[];
   events: RuntimeEvent[];
 };
@@ -33,6 +38,7 @@ type JsonState = {
 const emptyState = (): JsonState => ({
   knowledgeBases: [],
   applicationSettings: [],
+  tasks: [],
   sessions: [],
   events: []
 });
@@ -65,11 +71,17 @@ export class JsonDataStore implements DataStore {
   async listSessions(): Promise<ChatSession[]> {
     return structuredClone(this.state.sessions).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
+  async listTasks(): Promise<AgentTask[]> {
+    return structuredClone(this.state.tasks).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
   async listApplicationSettings(): Promise<ApplicationRuntimeSettings[]> {
     return structuredClone(this.state.applicationSettings);
   }
   async getSession(id: string): Promise<ChatSession | undefined> {
     return structuredClone(this.state.sessions.find((item) => item.id === id));
+  }
+  async getTask(id: string): Promise<AgentTask | undefined> {
+    return structuredClone(this.state.tasks.find((item) => item.id === id));
   }
   async listEvents(sessionId: string): Promise<RuntimeEvent[]> {
     return structuredClone(this.state.events.filter((event) => event.sessionId === sessionId));
@@ -98,6 +110,13 @@ export class JsonDataStore implements DataStore {
     const index = this.state.sessions.findIndex((item) => item.id === value.id);
     if (index === -1) this.state.sessions.push(structuredClone(value));
     else this.state.sessions[index] = structuredClone(value);
+    await this.persist();
+  }
+
+  async putTask(value: AgentTask): Promise<void> {
+    const index = this.state.tasks.findIndex((item) => item.id === value.id);
+    if (index === -1) this.state.tasks.push(structuredClone(value));
+    else this.state.tasks[index] = structuredClone(value);
     await this.persist();
   }
 
@@ -135,6 +154,11 @@ export class PostgresDataStore implements DataStore {
         payload jsonb NOT NULL,
         updated_at timestamptz NOT NULL DEFAULT now()
       );
+      CREATE TABLE IF NOT EXISTS agent_tasks (
+        id uuid PRIMARY KEY,
+        payload jsonb NOT NULL,
+        updated_at timestamptz NOT NULL DEFAULT now()
+      );
       CREATE TABLE IF NOT EXISTS application_settings (
         module_id text PRIMARY KEY,
         payload jsonb NOT NULL,
@@ -163,6 +187,11 @@ export class PostgresDataStore implements DataStore {
       (row) => row.payload as ChatSession
     );
   }
+  async listTasks(): Promise<AgentTask[]> {
+    return (await this.pool.query("SELECT payload FROM agent_tasks ORDER BY updated_at DESC")).rows.map(
+      (row) => row.payload as AgentTask
+    );
+  }
   async listApplicationSettings(): Promise<ApplicationRuntimeSettings[]> {
     return (await this.pool.query("SELECT payload FROM application_settings ORDER BY module_id")).rows.map(
       (row) => row.payload as ApplicationRuntimeSettings
@@ -171,6 +200,10 @@ export class PostgresDataStore implements DataStore {
   async getSession(id: string): Promise<ChatSession | undefined> {
     return (await this.pool.query("SELECT payload FROM chat_sessions WHERE id = $1", [id])).rows[0]
       ?.payload as ChatSession | undefined;
+  }
+  async getTask(id: string): Promise<AgentTask | undefined> {
+    return (await this.pool.query("SELECT payload FROM agent_tasks WHERE id = $1", [id])).rows[0]?.payload as
+      AgentTask | undefined;
   }
   async listEvents(sessionId: string): Promise<RuntimeEvent[]> {
     return (
@@ -197,6 +230,12 @@ export class PostgresDataStore implements DataStore {
   async putSession(value: ChatSession): Promise<void> {
     await this.pool.query(
       "INSERT INTO chat_sessions(id, payload, updated_at) VALUES($1, $2, now()) ON CONFLICT(id) DO UPDATE SET payload = EXCLUDED.payload, updated_at = now()",
+      [value.id, value]
+    );
+  }
+  async putTask(value: AgentTask): Promise<void> {
+    await this.pool.query(
+      "INSERT INTO agent_tasks(id, payload, updated_at) VALUES($1, $2, now()) ON CONFLICT(id) DO UPDATE SET payload = EXCLUDED.payload, updated_at = now()",
       [value.id, value]
     );
   }

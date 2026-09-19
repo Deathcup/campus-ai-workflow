@@ -4,6 +4,7 @@ dist/
 .DS_Store
 data/store.json
 data/sessions/
+data/tasks/
 data/skills/
 coverage/
 *.log

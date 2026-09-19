@@ -33,6 +33,18 @@ describe("JsonDataStore", () => {
       model: "company-model",
       updatedAt: now
     });
+    await first.putTask({
+      id: "task-1",
+      moduleId: "security-scan",
+      kind: "security-scan",
+      title: "project · main",
+      input: { kind: "security-scan", repositoryUrl: "https://example.com/project.git", branch: "main" },
+      agent: "claude",
+      status: "queued",
+      artifacts: [],
+      createdAt: now,
+      updatedAt: now
+    });
     await first.close();
 
     const second = new JsonDataStore(file);
@@ -48,6 +60,7 @@ describe("JsonDataStore", () => {
         updatedAt: now
       }
     ]);
+    expect((await second.listTasks()).map((task) => task.id)).toEqual(["task-1"]);
     await second.close();
   });
 });

@@ -4,6 +4,9 @@
 
 - `skill.json`：ID、名称、版本、说明和启用状态。
 - `SKILL.md`：Agent 可读取的完整操作指令。
+
+代码任务 Skill 还必须遵循 [Agent 产物交互协议](artifact-protocol.md)。公司 Skill 可以生成自己的中间文件，但结束前必须写出经过平台 Schema 校验的 `result.json` 和可在线展示的 `report.md`。
+
 - `files/`：可选的脚本、参考资料或模板。
 
 内置 Skill 位于 `capabilities/<module>/skills`，管理员添加的版本位于 `data/skills/<module>`。运行时两者合并，只复制启用项到新的 Attempt。

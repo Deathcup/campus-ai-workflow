@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type {
   AgentDescriptor,
+  AgentTask,
   ApplicationRuntimeSettings,
   ChatSession,
   KnowledgeBase,
@@ -9,32 +10,44 @@ import type {
 } from "@campus-ai/contracts";
 import {
   ArrowUp,
+  AlertTriangle,
   BookOpen,
   Bot,
   Boxes,
   Check,
+  CheckCircle2,
   ChevronRight,
+  CircleDot,
+  Clock3,
   Database,
+  FileCode2,
+  GitBranch,
+  GitPullRequest,
+  Link2,
   LoaderCircle,
   Menu,
   MessageSquareText,
   Plus,
   Settings,
+  ShieldCheck,
   Sparkles,
   Square,
   Trash2,
+  XCircle,
   X
 } from "lucide-react";
 import { api } from "./api";
 
-type View = "workspace" | "settings";
+type View = "knowledge-qa" | "security-scan" | "code-review" | "settings";
 type SettingsTab = "applications" | "knowledge" | "skills" | "runtime";
 
 export function App() {
-  const [view, setView] = useState<View>("workspace");
+  const [view, setView] = useState<View>("knowledge-qa");
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("applications");
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [selectedId, setSelectedId] = useState<string>();
+  const [tasks, setTasks] = useState<AgentTask[]>([]);
+  const [selectedTaskId, setSelectedTaskId] = useState<string>();
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
   const [agents, setAgents] = useState<AgentDescriptor[]>([]);
   const [modules, setModules] = useState<ModuleManifest[]>([]);
@@ -44,14 +57,17 @@ export function App() {
 
   const refresh = async () => {
     try {
-      const [nextSessions, nextBases, nextAgents, nextModules, nextApplicationSettings] = await Promise.all([
-        api.sessions(),
-        api.knowledgeBases(),
-        api.agents(),
-        api.modules(),
-        api.applicationSettings()
-      ]);
+      const [nextSessions, nextTasks, nextBases, nextAgents, nextModules, nextApplicationSettings] =
+        await Promise.all([
+          api.sessions(),
+          api.tasks(),
+          api.knowledgeBases(),
+          api.agents(),
+          api.modules(),
+          api.applicationSettings()
+        ]);
       setSessions(nextSessions);
+      setTasks(nextTasks);
       setKnowledgeBases(nextBases);
       setAgents(nextAgents);
       setModules(nextModules);
@@ -65,13 +81,35 @@ export function App() {
   useEffect(() => {
     void refresh();
   }, []);
+  const hasActiveTasks = tasks.some((task) => ["queued", "preparing", "running"].includes(task.status));
+  useEffect(() => {
+    if (!hasActiveTasks) return;
+    const timer = window.setInterval(() => void refresh(), 1_500);
+    return () => window.clearInterval(timer);
+  }, [hasActiveTasks]);
   const selected = sessions.find((session) => session.id === selectedId);
+  const selectedTask = tasks.find((task) => task.id === selectedTaskId);
 
   const selectSession = (id: string) => {
     setSelectedId(id);
-    setView("workspace");
+    setView("knowledge-qa");
     setSidebarOpen(false);
   };
+
+  const switchView = (next: View) => {
+    setView(next);
+    if (next === "security-scan" || next === "code-review") setSelectedTaskId(undefined);
+    setSidebarOpen(false);
+  };
+
+  const pageTitle =
+    view === "settings"
+      ? "管理设置"
+      : view === "security-scan"
+        ? (selectedTask?.title ?? "代码仓安全扫描")
+        : view === "code-review"
+          ? (selectedTask?.title ?? "代码检视")
+          : (selected?.title ?? "知识库问答");
 
   return (
     <div className="app-shell">
@@ -92,24 +130,27 @@ export function App() {
         <div className="nav-section-title">能力应用</div>
         <nav className="main-nav">
           <button
-            className={view === "workspace" ? "active" : ""}
-            onClick={() => {
-              setView("workspace");
-              setSidebarOpen(false);
-            }}
+            className={view === "knowledge-qa" ? "active" : ""}
+            onClick={() => switchView("knowledge-qa")}
           >
             <MessageSquareText size={17} /> 知识问答
+          </button>
+          <button
+            className={view === "security-scan" ? "active" : ""}
+            onClick={() => switchView("security-scan")}
+          >
+            <ShieldCheck size={17} /> 安全扫描
+          </button>
+          <button
+            className={view === "code-review" ? "active" : ""}
+            onClick={() => switchView("code-review")}
+          >
+            <GitPullRequest size={17} /> 代码检视
           </button>
         </nav>
         <div className="nav-section-title admin-title">平台</div>
         <nav className="main-nav admin-nav">
-          <button
-            className={view === "settings" ? "active" : ""}
-            onClick={() => {
-              setView("settings");
-              setSidebarOpen(false);
-            }}
-          >
+          <button className={view === "settings" ? "active" : ""} onClick={() => switchView("settings")}>
             <Settings size={17} /> 管理设置
           </button>
         </nav>
@@ -130,7 +171,7 @@ export function App() {
           </button>
           <div>
             <span className="eyebrow">AI WORKBENCH</span>
-            <h1>{view === "settings" ? "管理设置" : (selected?.title ?? "知识库问答")}</h1>
+            <h1>{pageTitle}</h1>
           </div>
           <div className="system-state">
             <span className="pulse" /> 服务运行中
@@ -145,7 +186,7 @@ export function App() {
             </button>
           </div>
         )}
-        {view === "workspace" ? (
+        {view === "knowledge-qa" ? (
           <KnowledgeWorkspace
             sessions={sessions}
             selected={selected}
@@ -156,6 +197,20 @@ export function App() {
             onCreated={(session) => {
               setSessions((all) => [session, ...all]);
               setSelectedId(session.id);
+            }}
+            onRefresh={refresh}
+            onError={setError}
+          />
+        ) : view === "security-scan" || view === "code-review" ? (
+          <TaskWorkspace
+            kind={view}
+            tasks={tasks}
+            selected={selectedTask?.kind === view ? selectedTask : undefined}
+            onSelect={setSelectedTaskId}
+            onNew={() => setSelectedTaskId(undefined)}
+            onCreated={(task) => {
+              setTasks((all) => [task, ...all]);
+              setSelectedTaskId(task.id);
             }}
             onRefresh={refresh}
             onError={setError}
@@ -528,6 +583,398 @@ function ChatView({
   );
 }
 
+function TaskWorkspace({
+  kind,
+  tasks,
+  selected,
+  onSelect,
+  onNew,
+  onCreated,
+  onRefresh,
+  onError
+}: {
+  kind: "security-scan" | "code-review";
+  tasks: AgentTask[];
+  selected?: AgentTask;
+  onSelect: (id: string) => void;
+  onNew: () => void;
+  onCreated: (task: AgentTask) => void;
+  onRefresh: () => Promise<void>;
+  onError: (message: string) => void;
+}) {
+  const config =
+    kind === "security-scan"
+      ? { name: "代码仓安全扫描", listName: "扫描任务", empty: "暂无扫描任务", icon: ShieldCheck }
+      : { name: "代码检视", listName: "检视任务", empty: "暂无检视任务", icon: GitPullRequest };
+  const moduleTasks = tasks.filter((task) => task.kind === kind);
+  const Icon = config.icon;
+  return (
+    <div className="knowledge-workspace task-workspace">
+      <aside className="module-sidebar">
+        <div className="module-sidebar-head">
+          <div>
+            <span>{config.name}</span>
+            <strong>{config.listName}</strong>
+          </div>
+          <button
+            className="module-new"
+            disabled={!selected}
+            onClick={onNew}
+            title={!selected ? "当前已在新建任务页面" : "新建任务"}
+          >
+            <Plus size={15} /> 新建任务
+          </button>
+        </div>
+        <div className="module-history">
+          {moduleTasks.map((task) => (
+            <button
+              key={task.id}
+              className={task.id === selected?.id ? "selected" : ""}
+              onClick={() => onSelect(task.id)}
+            >
+              <span className={`status-dot ${task.status}`} />
+              <span className="history-copy">
+                <strong>{task.title}</strong>
+                <small>
+                  {taskStatusLabel(task.status)} · {timeAgo(task.updatedAt)}
+                </small>
+              </span>
+              <ChevronRight size={14} />
+            </button>
+          ))}
+          {moduleTasks.length === 0 && (
+            <div className="module-empty">
+              <Icon size={20} />
+              <span>{config.empty}</span>
+            </div>
+          )}
+        </div>
+      </aside>
+      <section className="module-content">
+        {selected ? (
+          <TaskDetail task={selected} onRefresh={onRefresh} onError={onError} />
+        ) : (
+          <NewTask kind={kind} onCreated={onCreated} onError={onError} />
+        )}
+      </section>
+    </div>
+  );
+}
+
+function NewTask({
+  kind,
+  onCreated,
+  onError
+}: {
+  kind: "security-scan" | "code-review";
+  onCreated: (task: AgentTask) => void;
+  onError: (message: string) => void;
+}) {
+  const [repositoryUrl, setRepositoryUrl] = useState("");
+  const [branch, setBranch] = useState("main");
+  const [mergeRequestUrl, setMergeRequestUrl] = useState("");
+  const [saving, setSaving] = useState(false);
+  const isScan = kind === "security-scan";
+  const create = async (event: FormEvent) => {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      onCreated(
+        await api.createTask(
+          isScan ? { kind: "security-scan", repositoryUrl, branch } : { kind: "code-review", mergeRequestUrl }
+        )
+      );
+    } catch (cause) {
+      onError(messageOf(cause));
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <div className="content-scroll start-page task-start-page">
+      <section className="hero task-hero">
+        <div className="hero-icon">{isScan ? <ShieldCheck size={28} /> : <GitPullRequest size={28} />}</div>
+        <span className="section-kicker">{isScan ? "REPOSITORY SECURITY" : "MERGE REQUEST REVIEW"}</span>
+        <h2>{isScan ? "扫描确定版本，留下可核查证据" : "检视代码差异，合并前由人确认"}</h2>
+        <p>
+          {isScan
+            ? "平台会创建隔离任务目录，自动拉取指定分支并解析 commit，再调用该模块的 Skill。"
+            : "平台会解析 GitHub PR 或 GitLab MR，准备 head 代码和确定差异，再生成本地检视报告。"}
+        </p>
+      </section>
+      <form className="task-create-card" onSubmit={create}>
+        <div className="task-create-heading">
+          <div>
+            <span>NEW TASK</span>
+            <h3>{isScan ? "创建安全扫描任务" : "创建代码检视任务"}</h3>
+          </div>
+          <span className="managed-runtime-note">
+            <Sparkles size={13} /> Agent 与模型由管理员配置
+          </span>
+        </div>
+        {isScan ? (
+          <>
+            <label>
+              <span>代码仓地址</span>
+              <div className="input-with-icon">
+                <Link2 size={16} />
+                <input
+                  required
+                  value={repositoryUrl}
+                  onChange={(event) => setRepositoryUrl(event.target.value)}
+                  placeholder="https://git.example.com/team/project.git"
+                />
+              </div>
+              <small>支持 HTTPS 或 SSH 地址；私有仓权限由部署环境统一提供。</small>
+            </label>
+            <label>
+              <span>扫描分支</span>
+              <div className="input-with-icon">
+                <GitBranch size={16} />
+                <input required value={branch} onChange={(event) => setBranch(event.target.value)} />
+              </div>
+            </label>
+          </>
+        ) : (
+          <label>
+            <span>MR / PR 链接</span>
+            <div className="input-with-icon">
+              <GitPullRequest size={16} />
+              <input
+                required
+                type="url"
+                value={mergeRequestUrl}
+                onChange={(event) => setMergeRequestUrl(event.target.value)}
+                placeholder="https://github.com/org/repo/pull/123"
+              />
+            </div>
+            <small>支持 GitHub Pull Request 和 GitLab Merge Request 标准链接。</small>
+          </label>
+        )}
+        <div className="task-create-footer">
+          <span>
+            <FileCode2 size={14} /> 结果将按标准产物协议保存并等待人工确认
+          </span>
+          <button className="primary-button" disabled={saving}>
+            {saving ? <LoaderCircle className="spin" size={16} /> : <ArrowUp size={16} />}
+            {saving ? "正在创建" : "创建并开始"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function TaskDetail({
+  task,
+  onRefresh,
+  onError
+}: {
+  task: AgentTask;
+  onRefresh: () => Promise<void>;
+  onError: (message: string) => void;
+}) {
+  const [note, setNote] = useState("");
+  const [deciding, setDeciding] = useState(false);
+  const active = ["queued", "preparing", "running"].includes(task.status);
+  const decide = async (action: "confirm" | "reject") => {
+    setDeciding(true);
+    try {
+      await api.decideTask(task.id, { action, note });
+      await onRefresh();
+    } catch (cause) {
+      onError(messageOf(cause));
+    } finally {
+      setDeciding(false);
+    }
+  };
+  return (
+    <div className="content-scroll task-detail-page">
+      <div className="task-detail-header">
+        <div>
+          <span className="section-kicker">
+            {task.kind === "security-scan" ? "SECURITY SCAN" : "CODE REVIEW"}
+          </span>
+          <h2>{task.title}</h2>
+          <p>{task.progress}</p>
+        </div>
+        <span className={`task-status ${task.status}`}>{taskStatusLabel(task.status)}</span>
+      </div>
+
+      <div className="task-baseline-card">
+        <div>
+          <span>代码仓</span>
+          <strong>{task.baseline?.repositoryUrl ?? inputSource(task)}</strong>
+        </div>
+        <div>
+          <span>请求版本</span>
+          <strong>{task.baseline?.requestedRef ?? "准备中"}</strong>
+        </div>
+        <div>
+          <span>Commit</span>
+          <code>{task.baseline?.commitSha ?? "等待解析"}</code>
+        </div>
+        <div>
+          <span>创建时间</span>
+          <strong>{formatDateTime(task.createdAt)}</strong>
+        </div>
+      </div>
+
+      {active && (
+        <section className="task-running-card">
+          <span className="running-orbit">
+            <LoaderCircle className="spin" size={24} />
+          </span>
+          <div>
+            <strong>任务执行中</strong>
+            <p>{task.progress}</p>
+          </div>
+          <button className="secondary-button" onClick={() => void api.cancelTask(task.id).then(onRefresh)}>
+            <Square size={13} fill="currentColor" /> 取消任务
+          </button>
+        </section>
+      )}
+      {task.status === "failed" && (
+        <section className="task-error-card">
+          <XCircle size={22} />
+          <div>
+            <strong>任务执行失败</strong>
+            <p>{task.error}</p>
+          </div>
+        </section>
+      )}
+      {task.result && (
+        <>
+          <section className="result-summary-card">
+            <div className={`verdict-icon ${task.result.verdict}`}>
+              {task.result.verdict === "pass" ? <CheckCircle2 size={23} /> : <AlertTriangle size={23} />}
+            </div>
+            <div>
+              <span>AGENT RESULT · {verdictLabel(task.result.verdict)}</span>
+              <h3>{task.result.summary}</h3>
+            </div>
+            <strong>
+              {task.result.findings.length}
+              <small>发现</small>
+            </strong>
+          </section>
+
+          <section className="task-report-grid">
+            <div className="finding-column">
+              <div className="report-section-title">
+                <h3>结构化发现</h3>
+                <span>{task.result.findings.length}</span>
+              </div>
+              {task.result.findings.length === 0 ? (
+                <div className="no-findings">
+                  <CheckCircle2 size={24} />
+                  <span>未发现需要报告的问题</span>
+                </div>
+              ) : (
+                task.result.findings.map((finding) => (
+                  <article className="finding-card" key={finding.id}>
+                    <div className="finding-heading">
+                      <span className={`severity ${finding.severity}`}>
+                        {severityLabel(finding.severity)}
+                      </span>
+                      <code>{finding.id}</code>
+                      <span className="confidence">置信度 {finding.confidence}</span>
+                    </div>
+                    <h4>{finding.title}</h4>
+                    <p>{finding.description}</p>
+                    {finding.file && (
+                      <div className="code-location">
+                        <FileCode2 size={13} />
+                        <code>
+                          {finding.file}
+                          {finding.startLine
+                            ? `:${finding.startLine}${finding.endLine ? `-${finding.endLine}` : ""}`
+                            : ""}
+                        </code>
+                      </div>
+                    )}
+                    {finding.evidence && (
+                      <div className="finding-detail">
+                        <strong>证据</strong>
+                        <p>{finding.evidence}</p>
+                      </div>
+                    )}
+                    {finding.recommendation && (
+                      <div className="finding-detail recommendation">
+                        <strong>建议</strong>
+                        <p>{finding.recommendation}</p>
+                      </div>
+                    )}
+                  </article>
+                ))
+              )}
+            </div>
+            <div className="report-column">
+              <div className="report-section-title">
+                <h3>{task.kind === "security-scan" ? "本地扫描报告" : "本地检视报告"}</h3>
+                <span>Markdown</span>
+              </div>
+              <article className="markdown-report">{renderMarkdown(task.reportMarkdown ?? "")}</article>
+              {task.artifacts.length > 0 && (
+                <div className="artifact-list">
+                  <h4>补充产物</h4>
+                  {task.artifacts.map((artifact) => (
+                    <div key={artifact.path}>
+                      <FileCode2 size={14} />
+                      <span>{artifact.name}</span>
+                      <small>{formatBytes(artifact.size)}</small>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        </>
+      )}
+
+      {task.status === "waiting_user" && (
+        <section className="decision-card">
+          <div>
+            <CircleDot size={20} />
+            <span>
+              <strong>等待人工确认</strong>
+              <small>确认仅记录平台决策，不会自动向代码仓或 MR 提交任何内容。</small>
+            </span>
+          </div>
+          <textarea
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            placeholder="填写确认说明或驳回原因（可选）"
+            rows={3}
+          />
+          <div className="decision-actions">
+            <button
+              className="secondary-button reject-button"
+              disabled={deciding}
+              onClick={() => void decide("reject")}
+            >
+              <XCircle size={15} /> 驳回结果
+            </button>
+            <button className="primary-button" disabled={deciding} onClick={() => void decide("confirm")}>
+              <CheckCircle2 size={15} /> 确认结果
+            </button>
+          </div>
+        </section>
+      )}
+      {task.decision && (
+        <section className={`decision-result ${task.decision.action}`}>
+          {task.decision.action === "confirm" ? <CheckCircle2 size={20} /> : <XCircle size={20} />}
+          <div>
+            <strong>{task.decision.action === "confirm" ? "结果已确认" : "结果已驳回"}</strong>
+            <p>{task.decision.note || "未填写说明"}</p>
+            <small>{formatDateTime(task.decision.decidedAt)}</small>
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
 function SettingsView({
   tab,
   onTab,
@@ -713,7 +1160,11 @@ function ApplicationRuntimeCard({
           </datalist>
         </label>
         <div className="application-runtime-action">
-          <span>{model ? `新会话将使用 ${model}` : "模型为空：跟随 CLI 默认配置"}</span>
+          <span>
+            {model
+              ? `新${module.experience === "conversation" ? "会话" : "任务"}将使用 ${model}`
+              : "模型为空：跟随 CLI 默认配置"}
+          </span>
           <button className="primary-button" disabled={saving} onClick={() => void save()}>
             {saving ? <LoaderCircle className="spin" size={15} /> : saved ? <Check size={15} /> : null}
             {saving ? "保存中" : saved ? "已保存" : "保存应用配置"}
@@ -1067,4 +1518,57 @@ function statusLabel(status: ChatSession["status"]) {
     canceled: "已取消",
     interrupted: "已中断"
   }[status];
+}
+function taskStatusLabel(status: AgentTask["status"]) {
+  return {
+    queued: "排队中",
+    preparing: "准备代码",
+    running: "分析中",
+    waiting_user: "待确认",
+    confirmed: "已确认",
+    rejected: "已驳回",
+    failed: "失败",
+    canceled: "已取消",
+    interrupted: "已中断"
+  }[status];
+}
+function inputSource(task: AgentTask) {
+  return task.input.kind === "security-scan" ? task.input.repositoryUrl : task.input.mergeRequestUrl;
+}
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(value));
+}
+function verdictLabel(value: NonNullable<AgentTask["result"]>["verdict"]) {
+  return { pass: "通过", attention: "需要关注", required_changes: "需要修改" }[value];
+}
+function severityLabel(value: NonNullable<AgentTask["result"]>["findings"][number]["severity"]) {
+  return { info: "提示", low: "低", medium: "中", high: "高", critical: "严重" }[value];
+}
+function formatBytes(value: number) {
+  return value < 1024
+    ? `${value} B`
+    : value < 1024 * 1024
+      ? `${(value / 1024).toFixed(1)} KB`
+      : `${(value / 1024 / 1024).toFixed(1)} MB`;
+}
+function renderMarkdown(markdown: string) {
+  return markdown.split("\n").map((line, index) => {
+    if (line.startsWith("### ")) return <h4 key={index}>{line.slice(4)}</h4>;
+    if (line.startsWith("## ")) return <h3 key={index}>{line.slice(3)}</h3>;
+    if (line.startsWith("# ")) return <h2 key={index}>{line.slice(2)}</h2>;
+    if (line.startsWith("- "))
+      return (
+        <p className="markdown-list-item" key={index}>
+          • {line.slice(2)}
+        </p>
+      );
+    if (!line.trim()) return <br key={index} />;
+    return <p key={index}>{line}</p>;
+  });
 }

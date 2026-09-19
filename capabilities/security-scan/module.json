@@ -1,0 +1,21 @@
+{
+  "id": "security-scan",
+  "name": "代码仓安全扫描",
+  "description": "拉取指定代码仓和分支，调用模块 Skill 生成可确认的安全扫描报告",
+  "icon": "shield-check",
+  "enabled": true,
+  "capabilityVersion": "1.0.0",
+  "experience": "task",
+  "taskKind": "security-scan",
+  "systemPromptFile": "prompts/system.md",
+  "skillDirectory": "skills",
+  "runtime": {
+    "allowedTools": ["Read", "Glob", "Grep", "Write"]
+  },
+  "constraints": [
+    "只执行静态、只读的代码安全分析，不运行仓库中的安装脚本、构建脚本或未知二进制文件。",
+    "不得修改被扫描的业务源码；只允许写入 .ai-workbench/output。",
+    "每个问题必须提供可核查的代码证据，无法确认时降低 confidence，不得编造漏洞。",
+    "报告必须绑定平台提供的确定 commit SHA。"
+  ]
+}

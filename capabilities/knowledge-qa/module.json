@@ -5,6 +5,7 @@
   "icon": "book-open",
   "enabled": true,
   "capabilityVersion": "1.0.0",
+  "experience": "conversation",
   "systemPromptFile": "prompts/system.md",
   "skillDirectory": "skills",
   "runtime": {

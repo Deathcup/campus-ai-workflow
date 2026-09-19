@@ -4,7 +4,9 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
 import {
+  CreateAgentTaskInputSchema,
   CreateSessionInputSchema,
+  DecideTaskInputSchema,
   KnowledgeBaseSchema,
   SendMessageInputSchema,
   UpdateApplicationRuntimeSettingsSchema,
@@ -14,6 +16,7 @@ import type { AgentRuntime } from "@campus-ai/agent-runtime";
 import type { ModuleCatalog, SkillRegistry } from "@campus-ai/skill-registry";
 import type { DataStore } from "./store.js";
 import type { SessionService } from "./session-service.js";
+import type { TaskService } from "./task-service.js";
 
 type Dependencies = {
   store: DataStore;
@@ -21,6 +24,7 @@ type Dependencies = {
   catalog: ModuleCatalog;
   skills: SkillRegistry;
   sessions: SessionService;
+  tasks: TaskService;
   webDistDir: string;
 };
 
@@ -78,6 +82,26 @@ export async function buildApp(deps: Dependencies) {
     return reply.code(204).send();
   });
 
+  app.get("/api/tasks", async () => await deps.store.listTasks());
+  app.get("/api/tasks/:id", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const task = await deps.store.getTask(id);
+    return task ?? reply.code(404).send({ error: "任务不存在" });
+  });
+  app.post("/api/tasks", async (request, reply) => {
+    const input = CreateAgentTaskInputSchema.parse(request.body);
+    return reply.code(202).send(await deps.tasks.create(input));
+  });
+  app.post("/api/tasks/:id/decision", async (request) => {
+    const { id } = request.params as { id: string };
+    return await deps.tasks.decide(id, DecideTaskInputSchema.parse(request.body));
+  });
+  app.post("/api/tasks/:id/cancel", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    await deps.tasks.cancel(id);
+    return reply.code(202).send({ status: "canceling" });
+  });
+
   app.get("/api/sessions", async () => await deps.store.listSessions());
   app.get("/api/sessions/:id", async (request, reply) => {
     const { id } = request.params as { id: string };
@@ -129,7 +153,7 @@ export async function buildApp(deps: Dependencies) {
         ? 400
         : /不存在|未启用/.test(normalized.message)
           ? 404
-          : /正在生成|不可用|尚未配置/.test(normalized.message)
+          : /正在生成|不可用|尚未配置|等待确认状态/.test(normalized.message)
             ? 409
             : 500;
     app.log.error(error);

@@ -1,0 +1,6 @@
+{
+  "name": "AI Workbench 安全扫描产物适配器",
+  "description": "把公司安全扫描 Skill 的结果整理为平台 result.json、report.md 和 artifacts。",
+  "version": "1.0.0",
+  "enabled": true
+}

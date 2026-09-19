@@ -6,6 +6,7 @@ import { config } from "./config.js";
 import { EventBroker } from "./event-broker.js";
 import { SessionService } from "./session-service.js";
 import { JsonDataStore, PostgresDataStore, type DataStore } from "./store.js";
+import { TaskService } from "./task-service.js";
 
 const store: DataStore = config.databaseUrl
   ? new PostgresDataStore(config.databaseUrl)
@@ -21,14 +22,19 @@ const runtime = new ClaudeCompatibleCliRuntime({
 });
 const events = new EventBroker();
 const sessions = new SessionService(store, runtime, catalog, skills, events, config);
+const tasks = new TaskService(store, runtime, catalog, skills, config);
 await sessions.recoverInterruptedSessions();
+await tasks.recoverInterruptedTasks();
 
-if (!(await store.listApplicationSettings()).some((item) => item.moduleId === "knowledge-qa")) {
-  await store.putApplicationSettings({
-    moduleId: "knowledge-qa",
-    agent: "claude",
-    updatedAt: new Date().toISOString()
-  });
+const applicationSettings = await store.listApplicationSettings();
+for (const module of await catalog.list()) {
+  if (!applicationSettings.some((item) => item.moduleId === module.id)) {
+    await store.putApplicationSettings({
+      moduleId: module.id,
+      agent: "claude",
+      updatedAt: new Date().toISOString()
+    });
+  }
 }
 
 if ((await store.listKnowledgeBases()).length === 0) {
@@ -51,7 +57,15 @@ if ((await store.listKnowledgeBases()).length === 0) {
   });
 }
 
-const app = await buildApp({ store, runtime, catalog, skills, sessions, webDistDir: config.webDistDir });
+const app = await buildApp({
+  store,
+  runtime,
+  catalog,
+  skills,
+  sessions,
+  tasks,
+  webDistDir: config.webDistDir
+});
 await app.listen({ host: config.host, port: config.port });
 
 async function shutdown(signal: string) {

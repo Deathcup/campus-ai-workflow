@@ -1,6 +1,6 @@
 # Campus AI Workbench
 
-面向团队的可扩展 AI 工作台首版。当前打通“知识库问答”完整链路，支持 Claude Code 和与其 CLI 协议一致的 CodeAgent。
+面向团队的可扩展 AI 工作台首版。当前打通知识库问答、代码仓安全扫描和 MR/PR 代码检视三条链路，支持 Claude Code 和与其 CLI 协议一致的 CodeAgent。
 
 ## 已实现
 
@@ -9,12 +9,15 @@
 - 多轮会话：同一平台会话保存 Agent Session ID，后续问题通过 CLI resume 继续。
 - 模块级 Skill：管理员可添加模块专属 `SKILL.md`；每次 attempt 只复制该模块启用的 Skill。
 - 应用级运行策略：管理员为每个能力应用统一配置 Agent 和可选模型，普通用户无需理解模型参数。
+- 安全扫描任务：仓库地址和分支被解析为隔离目录与确定 commit，Agent 生成结构化发现和 Markdown 报告。
+- 代码检视任务：支持 GitHub PR / GitLab MR 链接，平台准备 head 代码与确定 diff，报告先在本地等待人工确认。
+- 标准产物协议：公司 Skill 可保留内部格式，但结束前必须适配 `.ai-workbench/output`，平台校验后再展示。
 - 会话隔离：运行目录为 `data/sessions/<session-id>/attempts/<attempt-id>`。
 - 实时状态：Fastify SSE 推送 Agent 事件，React 页面展示执行状态。
 - 双持久化模式：本地开发默认原子 JSON 文件；设置 `DATABASE_URL` 后使用 PostgreSQL。
 - 模块化扩展：`capabilities/<module-id>/module.json + prompts + skills` 描述新能力。
 
-平台侧栏只承载“能力应用”和“管理设置”。会话历史属于知识库问答模块内部；未来安全扫描可使用任务列表，代码变更通知可使用通知流，各模块不共享也不强制采用会话模型。
+平台侧栏只承载“能力应用”和“管理设置”。会话历史只属于知识库问答；安全扫描和代码检视各自使用任务列表、报告和人工决策，不共享也不强制采用会话模型。
 
 ## 快速启动
 
@@ -73,6 +76,16 @@ data/sessions/<session>/attempts/<attempt>/.codeagent/skills/  # CodeAgent
 
 Agent 的工作目录就是 attempt 目录，系统提示词明确要求先读取 `.agent/skills` 中列出的 Skill，且禁止加载其他模块能力。
 
+代码任务的 Skill 会装载到任务 workspace，并必须生成：
+
+```text
+.ai-workbench/output/result.json
+.ai-workbench/output/report.md
+.ai-workbench/output/artifacts/*
+```
+
+详细字段和公司 Skill 适配方式见 [Agent 产物交互协议](docs/artifact-protocol.md)。
+
 ## 接入真实知识库
 
 当前内置 Skill 是“XXX 数据库”的安全模板。接入时有两种方式：
@@ -103,5 +116,6 @@ npm run build
 - [CodeAgent 接入](docs/integration/codeagent-guide.md)
 - [登录系统接入](docs/integration/auth-integration-guide.md)
 - [任务协议](docs/task-protocol.md)
+- [Agent 产物交互协议](docs/artifact-protocol.md)
 - [Skill 契约](docs/skill-contract.md)
 - [模块扩展指南](docs/extending-modules.md)
