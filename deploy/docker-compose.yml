@@ -13,6 +13,7 @@ services:
       CODEAGENT_MODELS: ${CODEAGENT_MODELS:-}
       AGENT_TIMEOUT_MS: ${AGENT_TIMEOUT_MS:-300000}
       AGENT_MAX_BUDGET_USD: ${AGENT_MAX_BUDGET_USD:-2}
+      AGENT_MOCK: ${AGENT_MOCK:-false}
     volumes:
       - workbench_data:/app/data
     depends_on:

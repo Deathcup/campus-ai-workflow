@@ -12,9 +12,10 @@
     "build": "npm run build --workspaces --if-present",
     "check": "npm run check --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
+    "docs:check": "node scripts/check-doc-links.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "verify": "npm run format:check && npm run check && npm test && npm run build",
+    "verify": "npm run format:check && npm run check && npm test && npm run docs:check && npm run build",
     "start": "npm run start -w @campus-ai/server"
   },
   "devDependencies": {

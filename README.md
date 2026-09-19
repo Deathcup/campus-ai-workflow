@@ -98,12 +98,30 @@ Agent 的工作目录就是 attempt 目录，系统提示词明确要求先读�
 ## 验证
 
 ```bash
-npm run check
-npm test
-npm run build
+npm run verify
+npm audit --omit=dev --audit-level=high
 ```
 
-## 开发与公司集成文档
+`verify` 包含格式、类型、单元测试、Markdown 本地链接和生产构建检查。
+
+## 文档
+
+完整导航见 [文档中心](docs/README.md)。主要入口如下。
+
+### 平台与模块
+
+- [平台架构与边界](docs/platform/overview.md)
+- [配置参考](docs/platform/configuration.md)
+- [部署与运维](docs/platform/deployment-operations.md)
+- [HTTP API 参考](docs/platform/api-reference.md)
+- [知识库问答模块](docs/modules/knowledge-qa.md)
+- [代码仓安全扫描模块](docs/modules/security-scan.md)
+- [MR/PR 代码检视模块](docs/modules/code-review.md)
+- [会话与任务协议](docs/task-protocol.md)
+- [Agent 产物交互协议](docs/artifact-protocol.md)
+- [Skill 契约](docs/skill-contract.md)
+
+### 开发与公司集成
 
 - [贡献指南](CONTRIBUTING.md)
 - [开发总则](docs/development/development-guide.md)
@@ -115,7 +133,4 @@ npm run build
 - [第二个能力开发手册](docs/integration/second-capability-playbook.md)
 - [CodeAgent 接入](docs/integration/codeagent-guide.md)
 - [登录系统接入](docs/integration/auth-integration-guide.md)
-- [任务协议](docs/task-protocol.md)
-- [Agent 产物交互协议](docs/artifact-protocol.md)
-- [Skill 契约](docs/skill-contract.md)
 - [模块扩展指南](docs/extending-modules.md)

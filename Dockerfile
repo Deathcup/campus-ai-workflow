@@ -13,6 +13,9 @@ RUN npm run build
 FROM node:22-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=4100 DATA_DIR=/app/data CAPABILITIES_DIR=/app/capabilities
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates git openssh-client \
+  && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/apps/server/dist ./apps/server/dist
 COPY --from=build /app/apps/web/dist ./apps/web/dist
