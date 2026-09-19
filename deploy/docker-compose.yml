@@ -1,0 +1,40 @@
+services:
+  workbench:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    ports:
+      - "4100:4100"
+    environment:
+      DATABASE_URL: postgresql://workbench:workbench@postgres:5432/workbench
+      CLAUDE_COMMAND: ${CLAUDE_COMMAND:-claude}
+      CODEAGENT_COMMAND: ${CODEAGENT_COMMAND:-codeagent}
+      CLAUDE_MODELS: ${CLAUDE_MODELS:-sonnet,opus,fable}
+      CODEAGENT_MODELS: ${CODEAGENT_MODELS:-}
+      AGENT_TIMEOUT_MS: ${AGENT_TIMEOUT_MS:-300000}
+      AGENT_MAX_BUDGET_USD: ${AGENT_MAX_BUDGET_USD:-2}
+    volumes:
+      - workbench_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: workbench
+      POSTGRES_USER: workbench
+      POSTGRES_PASSWORD: workbench
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U workbench -d workbench"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  workbench_data:
+  postgres_data:

@@ -1,0 +1,19 @@
+{
+  "id": "knowledge-qa",
+  "name": "知识库问答",
+  "description": "从一个或多个在线知识库中检索、归纳并进行多轮问答",
+  "icon": "book-open",
+  "enabled": true,
+  "capabilityVersion": "1.0.0",
+  "systemPromptFile": "prompts/system.md",
+  "skillDirectory": "skills",
+  "runtime": {
+    "allowedTools": ["Read", "Glob", "Grep", "WebFetch", "WebSearch"]
+  },
+  "constraints": [
+    "此模块只用于检索、整理、归纳和解释知识库中的内容。",
+    "回答应明确区分知识库事实、合理推断和当前无法确认的信息。",
+    "如果用户要求编写代码，可以在回复中给出代码示例，但必须说明无法在用户真实环境中落地执行或修改。",
+    "不得声称访问了未实际检索的知识库，也不得伪造引用来源。"
+  ]
+}

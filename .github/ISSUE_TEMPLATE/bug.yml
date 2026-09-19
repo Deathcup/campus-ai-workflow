@@ -1,0 +1,39 @@
+name: Bug report
+description: 报告可在通用 Mock 环境复现的问题
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: 请勿提交公司代码、内部地址、真实日志、知识内容或凭据。
+  - type: textarea
+    id: summary
+    attributes:
+      label: 问题描述
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 脱敏复现步骤
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: 版本或 commit
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期行为
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: 信息安全确认
+      options:
+        - label: 内容不包含公司标识、内部代码、真实数据和凭据
+          required: true
